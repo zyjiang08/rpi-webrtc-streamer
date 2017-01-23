@@ -1,4 +1,4 @@
-SYSROOT=$(HOME)/Workspace/rpi_rootfs
+SYSROOT=/opt/rpi_rootfs
 SYSROOTFLAG=--sysroot=$(SYSROOT)
 ARMIFY=-mfpu=neon-vfpv4 -mfloat-abi=hard -funsafe-math-optimizations
 BACKTRACE=-funwind-tables -rdynamic
