@@ -1,0 +1,61 @@
+# Build arguments go here. Examples:
+#   is_component_build = true
+#   is_debug = false
+# See "gn args <out_dir> --list" for available build arguments.
+
+#  
+#
+# The following two flags are used for debugging.
+#
+#is_official_build=false
+#is_debug=true
+
+# For package building,  we need to chage is_official_build to true and is_debug to false. 
+#
+is_official_build=true
+is_debug=false
+
+is_component_build=false
+enable_iterator_debugging=false
+
+host_toolchain="//build/toolchain/linux:arm"
+is_clang=false
+use_sysroot=true
+target_sysroot="/opt/rpi_rootfs/rootfs"
+gold_path = "/opt/rpi_rootfs/tools/arm-linux-gnueabihf/bin"
+binutils_path = "/opt/rpi_rootfs/tools/arm-linux-gnueabihf/bin"
+
+# target CPU optimization for PI2
+target_os="linux"
+target_cpu="arm"
+arm_arch="armv7-a"
+arm_fpu="neon"
+arm_float_abi="hard"
+arm_use_neon=true
+arm_tune="cortex-a7"
+
+#
+# Setting for removing component for desktop related stuffs
+use_ozone=true
+is_desktop_linux=false
+libyuv_disable_jpeg=true
+use_system_libjpeg=true
+
+#
+# do not use libaom(AV1 codec)
+enable_libaom=false
+# not working removing vpx configuration
+#rtc_build_libvpx=false  # do not build libvpx
+#rtc_libvpx_build_vp9=false  # do not build VP9
+rtc_use_h264=true
+use_openh264=false
+
+#
+use_custom_libcxx=false    
+is_chrome_branded=true
+rtc_build_with_neon=true
+rtc_include_tests=false
+rtc_include_pulse_audio=false
+rtc_enable_protobuf=false
+treat_warnings_as_errors=false
+

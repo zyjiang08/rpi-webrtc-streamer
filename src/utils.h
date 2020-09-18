@@ -13,15 +13,42 @@
 #pragma once
 
 #include <assert.h>
+
 #include <string>
 
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(x) (sizeof(x) / sizeof(x[0]))
-#endif
+#include "absl/types/optional.h"
+#include "rtc_base/logging.h"
 
-std::string int2str(int i);
-std::string size_t2str(size_t i);
-const char *str_stream_connection_method(const long request_method);
+namespace utils {
+
+void PrintLicenseInfo();
+std::string GetVersionInfo();
+const char* GetProgramDescriptino();
+
+// utility functions
+std::string IntToString(int i);
+std::string Size_tToString(size_t i);
+bool StringToInt(const std::string& str, int* value);
+bool ParseVideoResolution(const std::string resolution, int* width,
+                          int* height);
+rtc::LoggingSeverity String2LogSeverity(const std::string severity);
+
+// Getting folder and parent folder from std::string path
+std::string GetFolder(std::string path);
+std::string GetParentFolder(std::string path);
+
+// Filesystem access utility helpers
+bool IsFolder(const std::string& file);
+bool IsFile(const std::string& file);
+bool DeleteFile(const std::string& file);
+bool MoveFile(const std::string& old_file, const std::string& new_file);
+bool GetFolderWithTailingDelimiter(const std::string& path,
+                                   std::string& path_with_delimiter);
+absl::optional<size_t> GetFileSize(const std::string& file);
+
+// Get hardware serial number from /proc/cpu
+bool GetHardwareDeviceId(std::string* deviceid);
+
+};  // namespace utils
 
 #endif  // RPI_STREAMER_UTILS_H_
-

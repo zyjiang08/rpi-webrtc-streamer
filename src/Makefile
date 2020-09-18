@@ -1,69 +1,137 @@
-#
-# 
-#
-include ../misc/cross_gn.mk
-#include ../misc/libwebsocket_cross.mk
+
+# including make scripts supports RWS building
+include ../mk/validate_variables.mk	 # validating required variable to build
+include ../mk/cross_arm_build.mk
+include ../mk/cross_mmal.mk
+include ../mk/libwebsocket_arm_build.mk
+include ../mk/libavahi_arm.mk
 
 #
-# h264bitstream & openssl library
+# including compat as source directory
 #
-H264BITSTREAM_LIB = ../lib/h264bitstream/.libs/libh264bitstream.a
-#OPENSSL_LIB = -lssl -lcrypto
-CCFLAGS +=  -I../lib
+VPATH = .:./compat
+
+RWS_INSTALL_DIR=\"/opt/rws\"
+RWS_VERSION=\"$(shell git describe --abbrev=16 --dirty --always --tags)\"
+WEBRTC_GIT=$(shell (cd $(WEBRTC_ROOT)/src/; git describe --abbrev=16 --dirty --always --tags))
+WEBRTC_CRPOSITION=$(shell (cd $(WEBRTC_ROOT)/src/;\
+	git log -1 | gawk 'match($$0,/Cr-Commit-Position/){print $$0}' | sed 's/ //g'))
+
+CCFLAGS += -DINSTALL_DIR=$(RWS_INSTALL_DIR) $(LWS_C_FLAGS) $(WEBRTC_CCFLAGS)
+CFLAGS += -DINSTALL_DIR=$(RWS_INSTALL_DIR) $(WEBRTC_CFLAGS)
+
+INCLUDES += $(LWS_INCLUDES) $(WEBRTC_DEFINES) $(WEBRTC_FLAGS_INCLUDES) \
+			$(H264BITSTREAM_INCLUDES) $(MMAL_INCLUDES) $(AVAHI_INCLUDES) \
+			-I$(SYSROOT)/usr/include/arm-linux-gnueabihf
+
+# adding abseil-cpp include path in this makefile
+INCLUDES += -I$(WEBRTC_ROOT)/src/third_party/abseil-cpp/
+
+# for Raspbian Strech
+BUILD_LIBS += $(WEBRTC_BUILD_LIBS) $(LWS_LIBS) $(AVAHI_LIBS)
+SYSLIBS += $(LWS_SYS_LIBS) $(WEBRTC_SYSLIBS)
+LDFLAGS += $(WEBRTC_LDFLAGS) $(MMAL_LDFLAGS)
+
+# Adding Version Information
+CCFLAGS += -D__RWS_VERSION__=$(RWS_VERSION) \
+		   -D__WEBRTC_VERSION__="\"$(WEBRTC_GIT),$(WEBRTC_CRPOSITION)\""
 
 #
-# Variables for MMAL(raspivid) compilation
+# Debugging purpose only
 #
-PI_INCLUDE=$(SYSROOT)/opt/vc/include
-MMAL_CFLAGS+=-Wno-multichar -Wno-unused-but-set-variable -fPIC -O3 -DDEBUG -DEGL_SERVER_DISPMANX -DHAVE_CMAKE_CONFIG -DHAVE_VMCS_CONFIG -DOMX_SKIP64BIT -DTV_SUPPORTED_MODE_NO_DEPRECATED -DUSE_VCHIQ_ARM -DVCHI_BULK_ALIGN=1 -DVCHI_BULK_GRANULARITY=1 -D_FILE_OFFSET_BITS=64 -D_HAVE_SBRK -D_LARGEFILE64_SOURCE -D_LARGEFILE_SOURCE -D_REENTRANT -D__VIDEOCORE4__ -D__WEBRTC_DEFAULT__
-
-MMAL_INCLUDES+=-I$(PI_INCLUDE)/interface/vcos/pthreads -I$(PI_INCLUDE)/interface/vmcs_host/linux -I$(PI_INCLUDE)/interface/vmcs_host -I$(PI_INCLUDE)/interface/vmcs_host/khronos -I$(PI_INCLUDE)/interface/khronos/include -I$(PI_INCLUDE)/interface/vchiq_arm -I$(PI_INCLUDE) -I$(PI_INCLUDE)/interface/mmal 
-
-MMAL_LDFLAGS+=-L$(SYSROOT)/opt/vc/lib/ -lmmal_core -lmmal -lmmal_util -lvcos -lcontainers -lbcm_host -lmmal_vc_client -lmmal_components -lvchiq_arm -lvcsm -lvcfiled_check 
+ifdef VERBOSE
+  $(info LWS_C_FLAGS is "$(LWS_C_FLAGS)")
+  $(info WEBRTC_CCFLAGS is "$(WEBRTC_CCFLAGS)")
+  $(info MMAL_CFLAGS is "$(MMAL_CFLAGS)")
+  $(info RWS_INSTALL_DIR is "$(RWS_INSTALL_DIR)")
+  $(info CFLAGS is "$(CFLAGS)")
+  $(info CCFLAGS is  "$(CCFLAGS)")
+  $(info INCLUDES is "$(INCLUDES)")
+  $(info SYSLIBS is "$(SYSLIBS)")
+  $(info LDFLAGS is "$(LDFLAGS)")
+  $(info BUILD_LIBS is "$(BUILD_LIBS)")
+endif
 
 #
-#
-SYS_LIBS += -lpthread -ldl -lrt -lm 
+# Raspberry PI testing host
+ifndef RPI_HOST_URL
+RPI_HOST_URL=pi@10.0.0.11:~/Workspace/client
+endif
 
-#
 # TARGET
 #
 TARGET = ../webrtc-streamer
+TARGET_LWS_LIBS = $(LWS_LIBS)
 
 #
 # source & object list definition
 #
-#SOURCES.CC = main.cc
-#SOURCES.C = 
-SOURCES.CC = stream_data_sockets.cc stream_sockets.cc direct_socket.cc streamer_observer.cc streamer.cc streamer_defaults.cc main.cc raspi_encoder.cc mmal_wrapper.cc h264bitstream_parser.cc utils.cc
-SOURCES.C = mmal_encoder.c mmal_encoder_reset.c mmal_util.c raspicli.c raspicamcontrol.c raspipreview.c 
+SOURCES.CC = websocket_server.cc websocket_server_callback.cc app_clientinfo.cc \
+	app_channel.cc  direct_socket.cc  \
+	raspi_decoder_dummy.cc raspi_decoder.cc raspi_encoder.cc raspi_encoder_impl.cc \
+	mmal_wrapper.cc utils.cc streamer_observer.cc streamer.cc main.cc \
+	raspi_quality_config.cc file_logger.cc app_ws_client.cc \
+	raspi_motion.cc raspi_motionvector.cc raspi_motionblob.cc raspi_motionfile.cc \
+	config_media.cc  config_streamer.cc  config_motion.cc \
+	utils_pc_config.cc utils_pc_strings.cc \
+	optionsfile.cc directory_iterator.cc file.cc file_posix.cc filestream.cc platform_file.cc
 
 
-OBJECTS.CC = $(SOURCES.CC:.cc=.o) 
-OBJECTS.CPP = $(SOURCES.CPP:.cpp=.o) 
+SOURCES.C = websocket_server_util.c mmal_video.c mmal_video_reset.c mmal_util.c raspicli.c \
+	raspicamcontrol.c raspipreview.c mdns_publish.c
+
+OBJECTS.CC = $(SOURCES.CC:.cc=.o)
+OBJECTS.CPP = $(SOURCES.CPP:.cpp=.o)
 OBJECTS.C = $(SOURCES.C:.c=.o)
 OBJECTS = $(OBJECTS.CC) $(OBJECTS.C) $(OBJECTS.CPP)
 
-all: $(TARGET)
+all: $(TARGET_LWS_LIBS) $(TARGET)
 
 #
 # Makefile rules...
 #
-.c.o : $(OBJECTS.C) 
-	$(CC) -MMD -MF $@.d -I. $(CFLAGS) $(MMAL_CFLAGS) $(MMAL_INCLUDES) -c $< -o $@
+.c.o : $(OBJECTS.C)
+	$(CC) -I. $(CFLAGS) $(INCLUDES) $(MMAL_CFLAGS) -D__MMAL_ENCODER_DEBUG__ -c $< -o $@
 
-.cc.o : $(OBJECTS.CC) 
-	$(CXX)  -MMD -MF $@.d -I. $(CFLAGS) $(CCFLAGS) $(CCFLAGS_DEFS) $(INCLUDE_WEBRTC_LIB) $(MMAL_CFLAGS) $(MMAL_INCLUDES)  -c $< -o $@
+.cc.o : $(OBJECTS.CC)
+	$(CXX)  -I. $(CFLAGS) $(CCFLAGS) $(MMAL_CFLAGS) $(INCLUDES)  -c $< -o $@
 
-.cpp.o : $(OBJECTS.CCP) 
-	$(CXX) -I. $(WSPP_CCFLAGS) $(WSPP_INCLUDE) -c $< -o $@
-
-$(TARGET): $(OBJECTS) 
-	$(CXX) $(LDFLAGS) -o $(TARGET) $(CFLAGS) $(CCFLAGS) -Wl,--start-group $(OBJECTS) $(INCLUDE_WEBRTC_LIB_LIST) $(MMAL_LDFLAGS) $(H264BITSTREAM_LIB) -Wl,--end-group $(OPENSSL_LIB) $(SYS_LIBS) 
+$(TARGET): $(OBJECTS)
+	$(CXX) $(LDFLAGS) -o $(TARGET) -Wl,--start-group $(OBJECTS) $(BUILD_LIBS) -Wl,--end-group $(SYSLIBS)
 
 clean:
-	rm -f *.o  *.o.d $(TARGET)
+	rm -f *.o  *.o.d  *.dwo $(TARGET)
 
+distclean: clean
+	rm -fr ../lib/libwebsockets
+
+$(TARGET_LWS_LIBS) :
+	../mk/config_libwebsockets.sh $(RPI_ROOTFS)
+
+#
+#  helper rules
+#
 rcp: $(TARGET)
-	rsync -v -u -r --stats $(TARGET) *.cc *.h pi@10.0.0.11:~/Workspace/client
+	rsync -v -u -r --stats $(TARGET) *.cc *.h *.dwo compat $(RPI_HOST_URL)
+
+rcp_full: $(TARGET)
+	rsync -v -u -r --stats $(TARGET) ../LICENSE ../tools ../etc ../etc/template ../web-root \
+		../scripts $(RPI_HOST_URL)
+
+web: $(TARGET)
+	rsync -v -u -r --stats ../web-root  $(RPI_HOST_URL)
+
+#
+# You need to install clang-format-9 
+format:
+	find . -maxdepth 2 -iname \*.h -o -iname \*.cc -o -iname \*.c \
+		| xargs clang-format-9 -style=file -i -fallback-style=none
+
+#
+# You need to configure ccls and bear(2.4.3 >= version) to generate compile_commands.json
+ccls:
+	make clean
+	bear --use-cc arm-linux-gnueabihf-gcc --use-c++ arm-linux-gnueabihf-g++  make
+	rm -f ../compile_commands.json
+	mv compile_commands.json ../
 
